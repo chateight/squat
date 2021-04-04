@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>squat</title>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<style media="screen">
+
+  body {
+    background-color: #fffff;
+  }
+ 
+  #parent {
+    align: center;
+  }
+
+  #lever {
+    display: inline-block;
+    width: 10px;
+    height: 150px;
+    margin-left: 100px;
+    margin-bottom: 200px;
+    border: #FFF solid 2px;
+		left:300px;
+    background-color: #8888;
+  }
+ 
+  #connect {
+    margin: 20px;
+    padding: 5px 20px;
+    font-size: 20px;
+  }
+
+  #mypic {
+    margin-left: 100px;
+    display: inline-block;
+  	position: relative;
+    padding: 5px 20px;
+  }
+
+ h1 { 
+    font-size:3.0em; 
+    text-indent: 0.8em; 
+    font-weight: bold; 
+    margin-top:14px;
+    margin-bottom:14px;
+  }
+
+ .h3 { 
+    display: block;
+    width: 500px;
+    border-bottom: solid 2px darkgray; 
+    border-left: solid 28px darkgray; 
+    font-size:1.9em; 
+    text-indent: 0.8em; 
+    font-weight: bold; 
+    margin-top:14px;
+    margin-bottom:14px;
+  }
+  .parent {
+  float: left;
+  display: inline-block;
+  }
+
+  .h4 { 
+    display: block;
+    width: 300px;
+    font-size:1.9em; 
+    text-indent: 0.8em; 
+    font-weight: bold; 
+    margin-top:14px;
+    margin-bottom:14px;
+  }
+</style>
+</head>
+
+<body>
+<audio id="audio" src="don.mp3"></audio>
+<button id="connect">micro:bitに接続</button>
+<h1><center>[えるごん]</center></h1>
+<div class="parent">
+  <div class="h3">スクワット回数</div>
+  <div class="h4"><h4 id="cnt">0</h4></div>
+  <div class="h3">しょうひエネルギー(Kcal)</div>
+  <div class="h4"><h4 id="cal">0</h4></div>
+</div>
+<div class="parent">
+  <div id="lever"></div>
+  <img id="mypic" src="up.png"></div>
+</div>
+
+<script>
+$(function(){
+  let $lever = $('#lever');
+ 
+  setAngle = angle => {
+    $lever.css("transform", "rotateZ("+angle+"deg)");
+  };
+ 
+  $('#connect').on('click',function(){
+    connect();
+  });
+ 
+  // 加速度UUID ※以下https://www.pc-koubou.jp/magazine/12416参考
+  const ACCELEROMETER_SERVICE_UUID = 'e95d0753-251d-470a-a062-fa1922dfa9a8';
+  const ACCELEROMETER_CHARACTERISTICS_UUID = 'e95dca4b-251d-470a-a062-fa1922dfa9a8';
+ 
+  let microbit = null;
+ 
+  function connect(){
+    //img source
+    var pics_src = new Array("up.png","dwn.png");
+    // up and down count
+    let sqCount = 0;
+    let flag = 0;
+    const stand = 0.9;
+    const down = 0.2;
+    //somoothed axis data
+    let zArray = [];
+    let yArray = [];
+    console.log('connect');
+    let options = {};
+ 
+    // BLEデバイスをスキャンする
+    navigator.bluetooth.requestDevice({
+      filters: [{
+        namePrefix: 'BBC micro:bit'
+      }],
+      optionalServices: [ACCELEROMETER_SERVICE_UUID]
+    })
+    .then(device => {
+      console.log(device);
+      microbit = device;
+      return device.gatt.connect();
+    })
+    .then(server => {
+      console.log(server);
+      return server.getPrimaryService(ACCELEROMETER_SERVICE_UUID);
+    })
+    .then(service => {
+      console.log(service);
+      return service.getCharacteristic(ACCELEROMETER_CHARACTERISTICS_UUID);
+    })
+    .then(characteristic => {
+      console.log(characteristic);
+      characteristic.startNotifications();
+      characteristic.addEventListener('characteristicvaluechanged', accelerometerChanged);
+    })
+    .catch(error => {
+      console.log(error);
+    });
+ 
+    function accelerometerChanged(event){
+      // 加速度X座標
+      let //accelX = event.target.value.getInt16(0, true)/1000.0,
+          accelY = event.target.value.getInt16(2, true)/1000.0,
+          accelZ = event.target.value.getInt16(4, true)/1000.0;
+      // 角度
+      // smoothing by sample averaged
+      zArray.push(accelZ);
+      if (zArray.length > 10){
+        zArray.shift();
+      }
+      yArray.push(accelY);
+      if (yArray.length > 10){
+        yArray.shift();
+      }
+      let yAve = (yArray.reduce((prev, current) => prev + current, 0)/yArray.length).toFixed(2);
+      let zAve = (zArray.reduce((prev, current) => prev + current, 0)/zArray.length).toFixed(2);
+//      console.log('y-value', yAve);
+      setAngle(Math.atan2(zAve, yAve) * (180.0 / Math.PI));
+      counter(yAve);
+    }
+    function counter(yAve){
+      if (flag == 0 && yAve < down){
+        flag = 1;
+      }
+      if (flag ==1 && yAve > stand){
+        sqCount ++;
+        flag = 0;
+        document.getElementById("audio").play();
+      }
+      var cnt = document.getElementById('cnt');
+        cnt.innerHTML = sqCount;
+      var cal = document.getElementById('cal');
+        cal.innerHTML = (sqCount*0.4).toFixed(1);
+      console.log('カウント', sqCount);
+      document.getElementById("mypic").src=pics_src[flag];
+    }
+  }
+});
+</script>
+</body>
+</html>
