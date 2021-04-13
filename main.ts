@@ -6,4 +6,4 @@ bluetooth.onBluetoothDisconnected(function () {
 })
 bluetooth.startAccelerometerService()
 bluetooth.startButtonService()
-basic.showIcon(IconNames.Happy)
+basic.showIcon(IconNames.Heart)
